@@ -196,9 +196,13 @@ However, if you already have Raspberry Pi OS set up and working on your TV then 
 
 At this point you can type `240mp` at any time to start up the app.  And if you installed the autostart service then the next time you boot your Pi it will boot directly into 240-MP.
 
-**If analog / composite audio is unusually quiet:** 
-- Run `amixer sset PCM 100%`
-- If that solves it and you want to keep the level across reboots, run `sudo alsactl store`
+**If analog / composite audio is unusually quiet during playback:**
+- mpv starts a fresh player process for each video, so a software volume boost should be set in mpv's config:
+    ```bash
+    mkdir -p ~/.config/mpv
+    printf 'volume=130\nvolume-max=130\n' > ~/.config/mpv/mpv.conf
+    ```
+- If the audio distorts, lower `volume` to `120` or `110`.
 
 **Exit to Terminal:** 
 - If you have the autostart service installed, the Quit dialog gains an `Exit to Terminal` option alongside `Power Off`. Choosing that will drop you to a login shell on the Pi instead of powering off, and leaves autostart intact for subsequent reboots. 
