@@ -202,6 +202,7 @@ At this point you can type `240mp` at any time to start up the app.  And if you 
 
 **Exit to Terminal:** 
 - If you have the autostart service installed, the Quit dialog gains an `Exit to Terminal` option alongside `Power Off`. Choosing that will drop you to a login shell on the Pi instead of powering off, and leaves autostart intact for subsequent reboots. 
+- You can trigger the same handoff over SSH with `sudo systemctl kill --kill-who=main --signal=SIGUSR1 240mp`.
 - To get back into 240-MP from that shell you can do one of the following:
     1. (*Recommended*) type `sudo systemctl start 240mp` to start up 240-MP and the autostart service again
     2. type `sudo reboot` to reboot and start up the device from scratch (which will also restart the autostart service)

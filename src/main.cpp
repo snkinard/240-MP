@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QWindow>
 #include <QQuickWindow>
+#include <QSocketNotifier>
 #include <locale.h>
 
 #include "AppCore.h"
@@ -19,6 +20,55 @@
 #include "input/InputManager.h"
 #ifdef Q_OS_MAC
 #include "macos_utils.h"
+#endif
+
+#ifdef Q_OS_LINUX
+#include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
+
+static int exitToTerminalSignalPipe[2] = {-1, -1};
+
+static void handleExitToTerminalSignal(int) {
+    const char byte = 'x';
+    if (exitToTerminalSignalPipe[1] != -1) {
+        ssize_t ignored = write(exitToTerminalSignalPipe[1], &byte, sizeof(byte));
+        (void)ignored;
+    }
+}
+
+static void installExitToTerminalSignalHandler(QCoreApplication &app) {
+    if (pipe(exitToTerminalSignalPipe) != 0) {
+        qWarning("[main] Could not install SIGUSR1 exit-to-terminal handler");
+        return;
+    }
+
+    fcntl(exitToTerminalSignalPipe[0], F_SETFL, O_NONBLOCK);
+    fcntl(exitToTerminalSignalPipe[1], F_SETFL, O_NONBLOCK);
+
+    struct sigaction action {};
+    sigemptyset(&action.sa_mask);
+    action.sa_handler = handleExitToTerminalSignal;
+    action.sa_flags = SA_RESTART;
+    if (sigaction(SIGUSR1, &action, nullptr) != 0) {
+        qWarning("[main] Could not install SIGUSR1 exit-to-terminal handler");
+        close(exitToTerminalSignalPipe[0]);
+        close(exitToTerminalSignalPipe[1]);
+        exitToTerminalSignalPipe[0] = -1;
+        exitToTerminalSignalPipe[1] = -1;
+        return;
+    }
+
+    auto *notifier = new QSocketNotifier(exitToTerminalSignalPipe[0], QSocketNotifier::Read, &app);
+    QObject::connect(notifier, &QSocketNotifier::activated, &app, [&app]() {
+        char buffer[32];
+        while (read(exitToTerminalSignalPipe[0], buffer, sizeof(buffer)) > 0) {}
+        qInfo("[main] SIGUSR1 received; exiting to terminal");
+        app.exit(10);
+    });
+}
+#else
+static void installExitToTerminalSignalHandler(QCoreApplication &) {}
 #endif
 
 static QString resolveAppRoot() {
@@ -68,6 +118,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     setlocale(LC_NUMERIC, "C");
+    installExitToTerminalSignalHandler(app);
 
     const QString appRoot  = resolveAppRoot();
     const QString dataRoot = resolveDataRoot();
